@@ -91,6 +91,11 @@ class BridgeTests(unittest.TestCase):
             validate_server("http://example.com")
         self.assertEqual(validate_server("http://localhost:8000/"), "http://localhost:8000")
 
+    def test_render_local_mode_is_reported(self):
+        with patch.dict("os.environ", {"RENDER": "true"}), patch.object(main, "CLOUD_MODE", False):
+            self.assertEqual(main.config()["mode"], "local")
+            self.assertIn("TALLY_MODE=cloud", main.config()["deployment_warning"])
+
 
 if __name__ == "__main__":
     unittest.main()

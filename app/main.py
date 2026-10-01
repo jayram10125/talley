@@ -58,7 +58,8 @@ def health():
 
 @app.get("/api/config")
 def config():
-    return {"mode": "cloud" if CLOUD_MODE else "local"}
+    return {"mode": "cloud" if CLOUD_MODE else "local",
+            "deployment_warning": "Render par TALLY_MODE=cloud configure karein." if os.getenv("RENDER") == "true" and not CLOUD_MODE else None}
 
 
 def agent_id(request: Request):

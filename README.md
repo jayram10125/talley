@@ -45,6 +45,23 @@ The API is documented at `http://127.0.0.1:8000/docs`. Key routes:
 
 ## Live website: cloud mode
 
+### Render deployment (`talley.onrender.com`)
+
+If the live page still shows **LOCAL MVP**, check `https://talley.onrender.com/api/config`. A response of `{"mode":"local"}` means the Render service is still running in local mode. In that mode, `localhost:9001` refers to the Render container, not the customer's Tally PC.
+
+In **Render Dashboard → talley service → Environment**, set these variables and choose **Save, rebuild, and deploy**:
+
+```text
+TALLY_MODE=cloud
+CLOUD_ADMIN_USER=owner
+CLOUD_ADMIN_PASSWORD=<your own random password, at least 20 characters>
+BRIDGE_DB_PATH=/var/data/bridge.sqlite3
+```
+
+Attach a persistent disk mounted at `/var/data` before using that database path. Render's Free web service does not support persistent disks; on Free, use `BRIDGE_DB_PATH=data/bridge.sqlite3` for a temporary trial, but pairing disappears after a service restart or redeploy. For reliable use, use a paid service with a disk or replace the SQLite bridge store with a managed database. Set Render's start command to `python -m uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 1`.
+
+After deployment, `/api/config` should require the browser's administrator login and return `{"mode":"cloud"}`. The page should show **CLOUD CONNECTOR** and **Pair new PC**. Pair the Tally PC, run the connector there, then refresh the PC list and connect. The cloud web service alone cannot connect to `localhost:9001` on the Tally PC.
+
 The current cloud mode is a **single-owner live deployment** protected by one administrator login. It supports pairing several Tally PCs to that owner. It is not a multi-customer SaaS account system: customer accounts, tenant isolation, billing, and audit logs need separate development before selling shared access to unrelated customers.
 
 1. Deploy this project on a server with a public HTTPS URL and a **persistent disk**. Configure environment variables:

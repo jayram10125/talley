@@ -37,7 +37,16 @@ def validate_job(xml):
     return xml.encode("utf-8")
 
 
-async def run(server, pair_code, tally_host, tally_port, config_path):
+async def run(server, pair_code, tally_host, tally_port, config_path, on_status=None, stop_event=None):
+    def report(state, detail):
+        if on_status:
+            on_status(state, detail)
+        else:
+            print(detail)
+
+    def stopped():
+        return stop_event is not None and stop_event.is_set()
+
     server = validate_server(server)
     path = Path(config_path).expanduser()
     saved = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
@@ -52,22 +61,26 @@ async def run(server, pair_code, tally_host, tally_port, config_path):
         if pair_code:
             response = await client.post(server + "/api/bridge/register", json={"code": pair_code})
             response.raise_for_status()
-            saved = {"server": server, "tally_host": tally_host, "tally_port": tally_port, **response.json()}
+            registration = response.json()
+            tally_port = registration.get("tally_port") or tally_port
+            saved = {"server": server, "tally_host": tally_host, "tally_port": tally_port, **registration}
             path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(json.dumps(saved), encoding="utf-8")
+            temporary = path.with_suffix(".tmp")
+            temporary.write_text(json.dumps(saved), encoding="utf-8")
+            temporary.replace(path)
             if os.name != "nt":
                 path.chmod(0o600)
-            print("Paired connector:", saved["connector_id"])
+            report("paired", "Paired connector: " + saved["connector_id"])
         if not saved.get("token"):
             raise ValueError("Pehli baar --pair-code zaroori hai.")
         headers = {"Authorization": "Bearer " + saved["token"]}
         started = False
-        while True:
+        while not stopped():
             try:
                 response = await client.get(server + "/api/bridge/agent/jobs", headers=headers)
                 response.raise_for_status()
                 if not started:
-                    print(f"Connector running. Cloud pairing verified. Tally endpoint: {tally_host}:{tally_port}")
+                    report("online", f"Connector running. Cloud pairing verified. Tally endpoint: {tally_host}:{tally_port}")
                     started = True
                 job = response.json()
                 if not job:
@@ -88,17 +101,20 @@ async def run(server, pair_code, tally_host, tally_port, config_path):
                     except httpx.HTTPError as exc:
                         if isinstance(exc, httpx.HTTPStatusError) and exc.response.status_code in (401, 403, 404):
                             raise RuntimeError(f"Cloud ne job {job['id']} result reject kiya: HTTP {exc.response.status_code}. Tally me record verify karein.") from exc
-                        print("Result delivery failed for job", job["id"], str(exc))
+                        report("warning", "Result delivery failed for job " + job["id"] + ": " + str(exc))
                         await asyncio.sleep(5)
-                print("Job", job["id"], "complete" if "xml_base64" in data else data["error"])
+                report("job", "Job " + job["id"] + (" complete" if "xml_base64" in data else ": " + data["error"]))
             except httpx.HTTPStatusError as exc:
                 if exc.response.status_code in (401, 403):
                     raise RuntimeError("Cloud pairing invalid hai. Website par Pair new PC se naya code lekar connector dobara chalayein.") from exc
-                print("Connector issue:", str(exc))
+                started = False
+                report("warning", "Connector issue: " + str(exc))
                 await asyncio.sleep(5)
             except (httpx.HTTPError, KeyError, json.JSONDecodeError) as exc:
-                print("Connector issue:", str(exc))
+                started = False
+                report("warning", "Connector issue: " + str(exc))
                 await asyncio.sleep(5)
+        report("stopped", "Connector stopped.")
 
 
 def main():

@@ -1,17 +1,20 @@
 import asyncio
 import base64
+import sqlite3
 import tempfile
 import threading
 import time
 import unittest
+import json
 from pathlib import Path
 from unittest.mock import patch
 
 from fastapi.testclient import TestClient
+import httpx
 
 import app.main as main
 from app.bridge import BridgeStore
-from connector.agent import validate_job, validate_server
+from connector.agent import run, validate_job, validate_server
 
 
 COMPANIES_XML = b"<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION><COMPANY><NAME>Cloud Demo</NAME></COMPANY></COLLECTION></DATA></BODY></ENVELOPE>"
@@ -48,8 +51,9 @@ class BridgeTests(unittest.TestCase):
                 with TestClient(main.app) as client:
                     self.assertEqual(client.get("/api/bridge/connectors").status_code, 401)
                     auth = ("owner", "long-secret-password-123")
-                    pair = client.post("/api/bridge/pair-codes", auth=auth).json()
+                    pair = client.post("/api/bridge/pair-codes", auth=auth, json={"tally_port": 9001}).json()
                     registered = client.post("/api/bridge/register", json={"code": pair["code"]}).json()
+                    self.assertEqual(registered["tally_port"], 9001)
                     agent_headers = {"Authorization": "Bearer " + registered["token"]}
                     listed = client.get("/api/bridge/connectors", auth=auth)
                     self.assertEqual(listed.status_code, 200)
@@ -95,10 +99,61 @@ class BridgeTests(unittest.TestCase):
             validate_server("http://example.com")
         self.assertEqual(validate_server("http://localhost:8000/"), "http://localhost:8000")
 
+    def test_existing_bridge_database_migrates_port_field(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = str(Path(directory) / "old.sqlite3")
+            db = sqlite3.connect(path)
+            try:
+                db.execute("CREATE TABLE pair_codes (code_hash TEXT PRIMARY KEY, connector_id TEXT NOT NULL, expires_at REAL NOT NULL)")
+                db.commit()
+            finally:
+                db.close()
+            store = BridgeStore(path)
+            pair = store.pair_code(9001)
+            self.assertEqual(store.register(pair["code"])["tally_port"], 9001)
+            store.close()
+
+    def test_website_port_is_used_by_connector(self):
+        with tempfile.TemporaryDirectory() as directory:
+            stop = threading.Event()
+            calls = []
+
+            def handler(request):
+                calls.append(request.url.path)
+                if request.url.path == "/api/bridge/register":
+                    return httpx.Response(200, json={"connector_id": "demo", "token": "secret", "tally_port": 9001})
+                stop.set()
+                return httpx.Response(200, json=None)
+
+            transport = httpx.MockTransport(handler)
+            client_class = httpx.AsyncClient
+
+            def client_factory(*_args, **_kwargs):
+                return client_class(transport=transport)
+
+            config_path = str(Path(directory) / "connector.json")
+            states = []
+            with patch("connector.agent.httpx.AsyncClient", new=client_factory):
+                asyncio.run(run("https://example.com", "one-time-code", "localhost", 9000,
+                                config_path, on_status=lambda state, detail: states.append((state, detail)),
+                                stop_event=stop))
+            self.assertEqual(json.loads(Path(config_path).read_text())["tally_port"], 9001)
+            self.assertIn("localhost:9001", next(detail for state, detail in states if state == "online"))
+            self.assertEqual(calls, ["/api/bridge/register", "/api/bridge/agent/jobs"])
+
     def test_render_local_mode_is_reported(self):
         with patch.dict("os.environ", {"RENDER": "true"}), patch.object(main, "CLOUD_MODE", False):
             self.assertEqual(main.config()["mode"], "local")
             self.assertIn("TALLY_MODE=cloud", main.config()["deployment_warning"])
+
+    def test_published_windows_connector_download(self):
+        if not main.CONNECTOR_BINARY.is_file():
+            self.skipTest("Windows connector has not been built")
+        with TestClient(main.app) as client:
+            self.assertEqual(main.config()["connector_download_url"], "/downloads/TallyConnector.exe")
+            response = client.get("/downloads/TallyConnector.exe")
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.content[:2], b"MZ")
 
 
 if __name__ == "__main__":

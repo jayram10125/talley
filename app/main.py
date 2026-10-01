@@ -9,7 +9,7 @@ from io import StringIO
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Query, Request
-from fastapi.responses import FileResponse, JSONResponse, Response
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
 from pydantic import BaseModel, Field
 
 from app.catalog import VIEWS, select_rows
@@ -25,6 +25,7 @@ from app.xml_parser import TallyError
 
 app = FastAPI(title="Tally Connect", version="0.1.0")
 STATIC_DIR = Path(__file__).resolve().parent / "static"
+CONNECTOR_BINARY = Path(__file__).resolve().parent / "downloads" / "TallyConnector.exe"
 CLOUD_MODE = os.getenv("TALLY_MODE", "local").lower() == "cloud"
 BRIDGE = BridgeStore(os.getenv("BRIDGE_DB_PATH", "data/bridge.sqlite3")) if CLOUD_MODE else None
 ADMIN_USER = os.getenv("CLOUD_ADMIN_USER", "")
@@ -58,8 +59,22 @@ def health():
 
 @app.get("/api/config")
 def config():
+    external_download = os.getenv("CONNECTOR_DOWNLOAD_URL", "")
     return {"mode": "cloud" if CLOUD_MODE else "local",
+            "connector_download_url": ("/downloads/TallyConnector.exe" if CONNECTOR_BINARY.is_file()
+                                       else external_download if external_download.startswith("https://") else ""),
             "deployment_warning": "Render par TALLY_MODE=cloud configure karein." if os.getenv("RENDER") == "true" and not CLOUD_MODE else None}
+
+
+@app.get("/downloads/TallyConnector.exe", include_in_schema=False)
+def download_connector():
+    if CONNECTOR_BINARY.is_file():
+        return FileResponse(CONNECTOR_BINARY, media_type="application/octet-stream",
+                            filename="TallyConnector.exe", headers={"Cache-Control": "no-store"})
+    external = os.getenv("CONNECTOR_DOWNLOAD_URL", "")
+    if external.startswith("https://"):
+        return RedirectResponse(external)
+    raise HTTPException(404, "Connector download is not published")
 
 
 def agent_id(request: Request):
@@ -72,10 +87,17 @@ def agent_id(request: Request):
 
 
 @app.post("/api/bridge/pair-codes")
-def pair_code():
+async def pair_code(request: Request):
     if not CLOUD_MODE:
         raise HTTPException(404)
-    return BRIDGE.pair_code()
+    try:
+        body = await request.json()
+    except ValueError:
+        body = {}
+    port = body.get("tally_port") if isinstance(body, dict) else None
+    if port is not None and (type(port) is not int or not 1 <= port <= 65535):
+        raise HTTPException(422, "Valid Tally port 1 se 65535 dein.")
+    return BRIDGE.pair_code(port)
 
 
 @app.get("/api/bridge/connectors")

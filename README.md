@@ -45,6 +45,20 @@ The API is documented at `http://127.0.0.1:8000/docs`. Key routes:
 
 ## Live website: cloud mode
 
+### Easy Windows connector for end users
+
+End users no longer need to download Python or this source project. On the website, click **Download Connector**, run `TallyConnector.exe` once, set the Tally port on the website, click **Pair new PC**, copy the code into the desktop app, and click **Connect**. The app installs itself for the current Windows user in `%LOCALAPPDATA%\TallyConnect\TallyConnector.exe`, starts when that user signs in, and stays in the system tray when its window closes. The port selected on the website is transferred through the pairing response; it can be changed in the desktop app later. TallyPrime must still be running with its HTTP server enabled. Users who were running the older Python CLI should stop that terminal before starting the desktop app.
+
+Build the Windows EXE on a Windows development machine (Python 3.9+):
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\build-connector.ps1
+```
+
+The build creates `dist\TallyConnector.exe` and copies it to `app\downloads\TallyConnector.exe`. Deploy that `app\downloads` file with the FastAPI service; the website then exposes **Download Connector**. Alternatively, host the EXE over HTTPS and set `CONNECTOR_DOWNLOAD_URL` on the server. A Windows build cannot be produced by Render's Linux build machine. The bundled EXE includes Python, HTTP client, GUI, and tray dependencies, so end users do not install them separately. Build the EXE again after changing `connector/` code and redeploy it. The current EXE is unsigned; public distribution should use a trusted code-signing certificate to reduce Windows publisher warnings.
+
+For a quick packaged-file check, run `dist\TallyConnector.exe --self-test` on Windows. To stop it, use the tray menu **Exit connector**. The desktop app's checkbox controls auto-start. To remove it completely, click **Remove PC** on the website, disable auto-start in the desktop app, exit it, then remove `%LOCALAPPDATA%\TallyConnect` and `%USERPROFILE%\.tally-connect`. The downloaded EXE in Downloads can also be deleted.
+
 ### Render deployment (`talley.onrender.com`)
 
 If the live page still shows **LOCAL MVP**, check `https://talley.onrender.com/api/config`. A response of `{"mode":"local"}` means the Render service is still running in local mode. In that mode, `localhost:9001` refers to the Render container, not the customer's Tally PC.
@@ -60,9 +74,9 @@ BRIDGE_DB_PATH=/var/data/bridge.sqlite3
 
 Attach a persistent disk mounted at `/var/data` before using that database path. Render's Free web service does not support persistent disks; on Free, use `BRIDGE_DB_PATH=data/bridge.sqlite3` for a temporary trial, but pairing disappears after a service restart or redeploy. For reliable use, use a paid service with a disk or replace the SQLite bridge store with a managed database. Set Render's start command to `python -m uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 1`.
 
-After deployment, `/api/config` should require the browser's administrator login and return `{"mode":"cloud"}`. The page should show **CLOUD CONNECTOR** and **Pair new PC**. Pair the Tally PC, run the connector there, then refresh the PC list and connect. The cloud web service alone cannot connect to `localhost:9001` on the Tally PC.
+After deployment, `/api/config` should require the browser's administrator login and return `{"mode":"cloud"}` plus a non-empty `connector_download_url`. The page should show **CLOUD CONNECTOR** and **Download Connector**. Download and run the EXE on the Tally PC, pair it, then refresh the PC list and connect. The cloud web service alone cannot connect to `localhost:9001` on the Tally PC.
 
-If **Refresh PCs** shows no connector and `/api/bridge/connectors` returns `[]`, the current server has no pairing record. Stop the PC connector, create a fresh code with **Pair new PC**, and rerun its pairing command. If this repeats after a Render restart or deploy, move `BRIDGE_DB_PATH` to a persistent disk and run only one service instance. The connector terminal should report **Cloud pairing verified** with current code; a saved token from a lost SQLite database cannot be reused.
+If **Refresh PCs** shows no connector and `/api/bridge/connectors` returns `[]`, the current server has no pairing record. Create a fresh code with **Pair new PC** and enter it in the desktop app. If this repeats after a Render restart or deploy, move `BRIDGE_DB_PATH` to a persistent disk and run only one service instance. A saved token from a lost SQLite database cannot be reused.
 
 The current cloud mode is a **single-owner live deployment** protected by one administrator login. It supports pairing several Tally PCs to that owner. It is not a multi-customer SaaS account system: customer accounts, tenant isolation, billing, and audit logs need separate development before selling shared access to unrelated customers.
 
@@ -76,17 +90,11 @@ The current cloud mode is a **single-owner live deployment** protected by one ad
    ```
 
 2. Start **one** FastAPI worker: `python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 1`. Put it behind the host's HTTPS reverse proxy. Keep `BRIDGE_DB_PATH` on durable storage; deleting it invalidates all connector pairings. Do not put the Tally HTTP port on the public internet.
-3. Open the HTTPS website and sign in via the browser's Basic Authentication prompt. Click **Pair new PC**. The displayed code expires after 10 minutes.
-4. On the computer where TallyPrime is running, install Python and this project, run `pip install -r requirements.txt`, then run the command shown on the website, for example:
-
-   ```powershell
-   python -m connector.agent --server https://your-site.example --pair-code YOUR_CODE --tally-port 9001
-   ```
-
-   The connector uses `localhost` for Tally by default. For an office-network Tally machine, add `--tally-host 192.168.x.x`. Its credential is saved under the PC user's `~/.tally-connect/connector.json`. Keep that file private. After pairing, restart with the same command **without** `--pair-code`.
+3. Open the HTTPS website and sign in via the browser's Basic Authentication prompt. Download the Windows connector and run it once on the Tally PC.
+4. On the website, enter the local Tally port and click **Pair new PC**. Copy the code into the desktop app and click **Connect**. The code expires after 10 minutes. The connector uses `localhost` for Tally by default. The app stores its token in the PC user's `~/.tally-connect/connector.json`; keep that file private.
 5. On the website, click **Refresh PCs**, select the online connector, then **Test Connection** and **Connect Tally**. Choose a loaded company. The data and CRUD screens work through the connector.
 
-The connector must remain running while the website accesses Tally. It connects outward to the website; no inbound firewall rule or public Tally port is required on the PC. The website's administrator password and connector token must remain secret. Protect the persistent database and keep regular backups. A request waits up to 40 seconds. If a write times out after the connector has started it, check its job status and the Tally record before retrying to avoid duplicates. Cloud deployment has not been tested against the user's real hosted URL because that URL and hosting details have not yet been provided.
+The connector must remain running while the website accesses Tally; the desktop app handles this from the system tray and starts again when the Windows user signs in. It connects outward to the website; no inbound firewall rule or public Tally port is required on the PC. The website's administrator password and connector token must remain secret. Protect the persistent database and keep regular backups. A request waits up to 40 seconds. If a write times out after the connector has started it, check its job status and the Tally record before retrying to avoid duplicates. The current Windows EXE was smoke-tested without connecting to a real customer Tally company; the live website must be redeployed with the updated app and EXE before end-to-end verification.
 
 To disconnect a PC permanently, call `DELETE /api/bridge/connectors/{connector_id}` with the administrator login. This revokes its saved token. The database removes expired pairing codes and jobs older than 24 hours when new pairing codes or jobs are created.
 

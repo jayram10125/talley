@@ -29,7 +29,7 @@ class BridgeStore:
                     last_seen REAL NOT NULL DEFAULT 0);
                 CREATE TABLE IF NOT EXISTS pair_codes (
                     code_hash TEXT PRIMARY KEY, connector_id TEXT NOT NULL,
-                    expires_at REAL NOT NULL);
+                    expires_at REAL NOT NULL, tally_port INTEGER);
                 CREATE TABLE IF NOT EXISTS jobs (
                     id TEXT PRIMARY KEY, connector_id TEXT NOT NULL,
                     payload BLOB NOT NULL, status TEXT NOT NULL,
@@ -37,24 +37,29 @@ class BridgeStore:
                     claimed_at REAL, finished_at REAL);
                 CREATE INDEX IF NOT EXISTS jobs_pending ON jobs(connector_id,status,created_at);
             """)
+            columns = {row[1] for row in self.db.execute("PRAGMA table_info(pair_codes)")}
+            if "tally_port" not in columns:
+                self.db.execute("ALTER TABLE pair_codes ADD COLUMN tally_port INTEGER")
 
     def close(self):
         with self.lock:
             self.db.close()
 
-    def pair_code(self):
+    def pair_code(self, tally_port=None):
+        if tally_port is not None and (type(tally_port) is not int or not 1 <= tally_port <= 65535):
+            raise ValueError("Invalid Tally port")
         code = secrets.token_urlsafe(18)
         connector_id = uuid.uuid4().hex
         with self.lock, self.db:
             self._prune()
             self.db.execute("INSERT INTO connectors(id,created_at) VALUES (?,?)", (connector_id, time.time()))
-            self.db.execute("INSERT INTO pair_codes VALUES (?,?,?)",
-                            (digest(code), connector_id, time.time() + 600))
+            self.db.execute("INSERT INTO pair_codes(code_hash,connector_id,expires_at,tally_port) VALUES (?,?,?,?)",
+                            (digest(code), connector_id, time.time() + 600, tally_port))
         return {"code": code, "connector_id": connector_id, "expires_in": 600}
 
     def register(self, code):
         with self.lock, self.db:
-            row = self.db.execute("SELECT connector_id FROM pair_codes WHERE code_hash=? AND expires_at>?",
+            row = self.db.execute("SELECT connector_id,tally_port FROM pair_codes WHERE code_hash=? AND expires_at>?",
                                   (digest(code), time.time())).fetchone()
             if not row:
                 return None
@@ -62,7 +67,10 @@ class BridgeStore:
             token = secrets.token_urlsafe(48)
             self.db.execute("UPDATE connectors SET token_hash=?,last_seen=? WHERE id=?",
                             (digest(token), time.time(), row["connector_id"]))
-            return {"connector_id": row["connector_id"], "token": token}
+            result = {"connector_id": row["connector_id"], "token": token}
+            if row["tally_port"] is not None:
+                result["tally_port"] = row["tally_port"]
+            return result
 
     def authenticate(self, token):
         if not token:

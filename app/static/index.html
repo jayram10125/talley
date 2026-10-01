@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tally Connect · Local Data Explorer</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand"><div class="brand-mark">T</div><div><strong>Tally Connect</strong><small>LOCAL DATA EXPLORER</small></div></div>
+      <div class="sidebar-label">WORKSPACE</div>
+      <nav id="navigation" aria-label="Data sections">
+        <button class="nav-item active" data-view="ledgers">◫ <span>Ledgers</span></button>
+        <button class="nav-item" data-view="parties">◈ <span>Parties</span></button>
+        <button class="nav-item" data-view="stock-items">▦ <span>Stock Items</span></button>
+        <button class="nav-item" data-view="stock-groups">▤ <span>Stock Groups</span></button>
+        <button class="nav-item" data-view="stock-summary">▥ <span>Stock Summary</span></button>
+        <button class="nav-item" data-view="vouchers">▧ <span>Vouchers</span></button>
+        <button class="nav-item" data-view="sales">↗ <span>Sales</span></button>
+        <button class="nav-item" data-view="purchases">↙ <span>Purchases</span></button>
+        <button class="nav-item" data-view="day-book">▣ <span>Day Book</span></button>
+      </nav>
+      <div class="sidebar-footer">Read only access to your TallyPrime data</div>
+    </aside>
+
+    <main class="main-content">
+      <header class="topbar"><div class="breadcrumb">Workspace <span>/</span> <b id="breadcrumb-view">Ledgers</b></div><span class="local-badge">● LOCAL MVP</span></header>
+      <div class="content">
+        <section class="hero"><div><div class="eyebrow">YOUR BUSINESS DATA, IN ONE PLACE</div><h1>Connect to TallyPrime</h1><p>Connect your local Tally server, choose a company, and explore live records.</p></div><div class="hero-art" aria-hidden="true"><div class="hero-circle one"></div><div class="hero-circle two"></div><div class="hero-glyph">T</div></div></section>
+
+        <section class="connection-card card" aria-labelledby="connection-title">
+          <div class="section-heading"><div><h2 id="connection-title">Connection settings</h2><p>Enter the Host/IP and Port configured in TallyPrime.</p></div><span id="connection-status" class="status-pill disconnected">Not connected</span></div>
+          <div class="connection-grid"><label>Host / IP Address<input id="host" type="text" value="localhost" spellcheck="false" autocomplete="off" placeholder="localhost or 192.168.1.10"></label><label>Port Number<input id="port" type="number" value="9000" min="1" max="65535"></label><button id="test-button" class="button button-secondary" type="button">Test Connection</button><button id="connect-button" class="button button-primary" type="button">Connect Tally</button></div>
+          <div id="connection-message" class="message" role="status">Start TallyPrime, load a company, and enable its HTTP server before connecting.</div>
+        </section>
+
+        <section id="workspace" class="workspace hidden" aria-label="Tally data">
+          <div class="workspace-heading"><div><div class="eyebrow">LIVE FROM TALLYPRIME</div><h2 id="view-title">Ledgers</h2><p id="view-description">Choose a company and fetch data.</p></div><div class="workspace-actions"><button id="refresh-button" class="button button-secondary" type="button">↻ &nbsp;Refresh</button><button id="csv-button" class="button button-primary" type="button">↓ &nbsp;Download CSV</button></div></div>
+          <div class="toolbar card"><label>Company<select id="company"><option value="">Select company</option></select></label><label id="from-wrap" class="date-field hidden">From date<input id="from-date" type="date"></label><label id="to-wrap" class="date-field hidden">To date<input id="to-date" type="date"></label><label class="search-field">Search records<input id="search" type="search" placeholder="Search this table..."></label></div>
+          <div class="stats"><div class="stat card"><span>Records loaded</span><strong id="record-count">—</strong></div><div class="stat card"><span>Current section</span><strong id="stat-section">Ledgers</strong></div><div class="stat card"><span>Selected company</span><strong id="stat-company">—</strong></div></div>
+          <div class="table-card card"><div class="table-heading"><div><h3 id="table-title">Ledger records</h3><p id="table-subtitle">Data appears here after you select a company.</p></div><span id="visible-count" class="count-pill">0 shown</span></div><div id="data-message" class="table-message">Select a company to load data.</div><div class="table-scroll"><table id="data-table" class="hidden"><thead id="table-head"></thead><tbody id="table-body"></tbody></table></div></div>
+        </section>
+      </div>
+    </main>
+  </div>
+</body>
+</html>

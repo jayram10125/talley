@@ -20,10 +20,10 @@ VIEWS = {
     "stock-items": View("Stock Items", "stock-items", "Stock Item", ("Name", "Parent", "BaseUnits", "ClosingBalance", "ClosingRate", "ClosingValue", "MasterID")),
     "stock-groups": View("Stock Groups", "stock-groups", "Stock Group", ("Name", "Parent", "MasterID")),
     "stock-summary": View("Stock Summary", "stock-items", "Stock Item", ("Name", "Parent", "ClosingBalance", "ClosingRate", "ClosingValue")),
-    "vouchers": View("Vouchers", "vouchers", "Voucher", ("Date", "VoucherTypeName", "VoucherNumber", "PartyLedgerName", "Amount", "MasterID"), True),
-    "sales": View("Sales Transactions", "vouchers", "Voucher", ("Date", "VoucherTypeName", "VoucherNumber", "PartyLedgerName", "Amount", "MasterID"), True),
-    "purchases": View("Purchase Transactions", "vouchers", "Voucher", ("Date", "VoucherTypeName", "VoucherNumber", "PartyLedgerName", "Amount", "MasterID"), True),
-    "day-book": View("Day Book", "vouchers", "Voucher", ("Date", "VoucherTypeName", "VoucherNumber", "PartyLedgerName", "Amount", "MasterID"), True),
+    "vouchers": View("Vouchers", "vouchers", "Voucher", ("Date", "VoucherTypeName", "VoucherNumber", "PartyLedgerName", "Narration", "Amount", "MasterID"), True),
+    "sales": View("Sales Transactions", "vouchers", "Voucher", ("Date", "VoucherTypeName", "VoucherNumber", "PartyLedgerName", "Narration", "Amount", "MasterID"), True),
+    "purchases": View("Purchase Transactions", "vouchers", "Voucher", ("Date", "VoucherTypeName", "VoucherNumber", "PartyLedgerName", "Narration", "Amount", "MasterID"), True),
+    "day-book": View("Day Book", "vouchers", "Voucher", ("Date", "VoucherTypeName", "VoucherNumber", "PartyLedgerName", "Narration", "Amount", "MasterID"), True),
 }
 
 

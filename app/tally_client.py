@@ -7,6 +7,7 @@ import httpx
 
 from app.xml_builder import build_collection_request
 from app.xml_parser import MAX_RESPONSE_BYTES, TallyError, parse_collection_response
+from app.xml_import import parse_import_result
 
 
 def resolve_private_host(host: str) -> str:
@@ -30,10 +31,18 @@ def resolve_private_host(host: str) -> str:
 
 async def fetch_tally(host: str, port: int, view_name: str, company: str = "",
                       from_date=None, to_date=None) -> list:
+    payload = build_collection_request(view_name, company, from_date, to_date)
+    return parse_collection_response(await send_xml(host, port, payload), view_name)
+
+
+async def import_tally(host: str, port: int, payload: bytes, action: str) -> dict:
+    return parse_import_result(await send_xml(host, port, payload), action)
+
+
+async def send_xml(host: str, port: int, payload: bytes) -> bytes:
     address = resolve_private_host(host)
     literal = f"[{address}]" if ":" in address else address
     url = f"http://{literal}:{port}/"
-    payload = build_collection_request(view_name, company, from_date, to_date)
     try:
         async with httpx.AsyncClient(timeout=httpx.Timeout(25.0, connect=4.0),
                                      trust_env=False, follow_redirects=False) as client:
@@ -46,7 +55,7 @@ async def fetch_tally(host: str, port: int, view_name: str, company: str = "",
                     if size > MAX_RESPONSE_BYTES:
                         raise TallyError("Response bahut bada hai. Chhoti date range try karein.")
                     chunks.append(chunk)
-        return parse_collection_response(b"".join(chunks), view_name)
+        return b"".join(chunks)
     except (httpx.ConnectError, httpx.ConnectTimeout) as exc:
         raise TallyError(f"{host}:{port} par Tally connect nahi hua. TallyPrime, company aur HTTP Server check karein.") from exc
     except httpx.TimeoutException as exc:

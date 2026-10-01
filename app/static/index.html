@@ -6,6 +6,7 @@
   <title>Tally Connect · Local Data Explorer</title>
   <link rel="stylesheet" href="/styles.css">
   <script src="/app.js" defer></script>
+  <script src="/crud.js" defer></script>
 </head>
 <body>
   <div class="app-shell">
@@ -23,7 +24,7 @@
         <button class="nav-item" data-view="purchases">↙ <span>Purchases</span></button>
         <button class="nav-item" data-view="day-book">▣ <span>Day Book</span></button>
       </nav>
-      <div class="sidebar-footer">Read only access to your TallyPrime data</div>
+      <div class="sidebar-footer">View and manage your TallyPrime records</div>
     </aside>
 
     <main class="main-content">
@@ -33,18 +34,27 @@
 
         <section class="connection-card card" aria-labelledby="connection-title">
           <div class="section-heading"><div><h2 id="connection-title">Connection settings</h2><p>Enter the Host/IP and Port configured in TallyPrime.</p></div><span id="connection-status" class="status-pill disconnected">Not connected</span></div>
-          <div class="connection-grid"><label>Host / IP Address<input id="host" type="text" value="localhost" spellcheck="false" autocomplete="off" placeholder="localhost or 192.168.1.10"></label><label>Port Number<input id="port" type="number" value="9000" min="1" max="65535"></label><button id="test-button" class="button button-secondary" type="button">Test Connection</button><button id="connect-button" class="button button-primary" type="button">Connect Tally</button></div>
+          <div id="local-connection" class="connection-grid"><label>Host / IP Address<input id="host" type="text" value="localhost" spellcheck="false" autocomplete="off" placeholder="localhost or 192.168.1.10"></label><label>Port Number<input id="port" type="number" value="9000" min="1" max="65535"></label><button id="test-button" class="button button-secondary" type="button">Test Connection</button><button id="connect-button" class="button button-primary" type="button">Connect Tally</button></div>
+          <div id="cloud-connection" class="hidden"><div class="connection-grid"><label>Paired Tally PC<select id="connector"><option value="">Select connector</option></select></label><button id="pair-button" class="button button-secondary" type="button">Pair new PC</button><button id="connector-refresh" class="button button-secondary" type="button">Refresh PCs</button><button id="cloud-test-button" class="button button-secondary" type="button">Test Connection</button><button id="cloud-connect-button" class="button button-primary" type="button">Connect Tally</button></div><div id="pair-instructions" class="message hidden" style="overflow-wrap:anywhere" role="status"></div></div>
           <div id="connection-message" class="message" role="status">Start TallyPrime, load a company, and enable its HTTP server before connecting.</div>
         </section>
 
         <section id="workspace" class="workspace hidden" aria-label="Tally data">
-          <div class="workspace-heading"><div><div class="eyebrow">LIVE FROM TALLYPRIME</div><h2 id="view-title">Ledgers</h2><p id="view-description">Choose a company and fetch data.</p></div><div class="workspace-actions"><button id="refresh-button" class="button button-secondary" type="button">↻ &nbsp;Refresh</button><button id="csv-button" class="button button-primary" type="button">↓ &nbsp;Download CSV</button></div></div>
+          <div class="workspace-heading"><div><div class="eyebrow">LIVE FROM TALLYPRIME</div><h2 id="view-title">Ledgers</h2><p id="view-description">Choose a company and fetch data.</p></div><div class="workspace-actions"><button id="new-record-button" class="button button-primary" type="button">+ &nbsp;Create</button><button id="refresh-button" class="button button-secondary" type="button">↻ &nbsp;Refresh</button><button id="csv-button" class="button button-secondary" type="button">↓ &nbsp;Download CSV</button></div></div>
           <div class="toolbar card"><label>Company<select id="company"><option value="">Select company</option></select></label><label id="from-wrap" class="date-field hidden">From date<input id="from-date" type="date"></label><label id="to-wrap" class="date-field hidden">To date<input id="to-date" type="date"></label><label class="search-field">Search records<input id="search" type="search" placeholder="Search this table..."></label></div>
           <div class="stats"><div class="stat card"><span>Records loaded</span><strong id="record-count">—</strong></div><div class="stat card"><span>Current section</span><strong id="stat-section">Ledgers</strong></div><div class="stat card"><span>Selected company</span><strong id="stat-company">—</strong></div></div>
+          <div id="write-message" class="message hidden" role="status"></div>
           <div class="table-card card"><div class="table-heading"><div><h3 id="table-title">Ledger records</h3><p id="table-subtitle">Data appears here after you select a company.</p></div><span id="visible-count" class="count-pill">0 shown</span></div><div id="data-message" class="table-message">Select a company to load data.</div><div class="table-scroll"><table id="data-table" class="hidden"><thead id="table-head"></thead><tbody id="table-body"></tbody></table></div></div>
         </section>
       </div>
     </main>
+  </div>
+  <div id="record-modal" class="modal-backdrop hidden" role="presentation">
+    <section class="record-modal" role="dialog" aria-modal="true" aria-labelledby="record-modal-title">
+      <div class="modal-heading"><div><div class="eyebrow">TALLY RECORD</div><h2 id="record-modal-title">Create record</h2></div><button id="close-record-modal" type="button" class="icon-button" aria-label="Close">×</button></div>
+      <p id="record-modal-hint" class="modal-hint"></p>
+      <form id="record-form"><div id="record-fields"></div><div id="record-form-error" class="message error hidden" role="alert"></div><div class="modal-actions"><button type="button" id="cancel-record-modal" class="button button-secondary">Cancel</button><button id="save-record-button" type="submit" class="button button-primary">Save to Tally</button></div></form>
+    </section>
   </div>
 </body>
 </html>

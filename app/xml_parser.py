@@ -25,7 +25,7 @@ def _remove_invalid_character_reference(match):
     return match.group(0) if valid else b""
 
 
-def parse_collection_response(payload: bytes, view_name: str) -> list:
+def parse_xml_root(payload: bytes):
     if len(payload) > MAX_RESPONSE_BYTES:
         raise TallyError("Response bahut bada hai. Chhoti date range try karein.")
     if b"<!DOCTYPE" in payload.upper() or b"<!ENTITY" in payload.upper():
@@ -35,8 +35,13 @@ def parse_collection_response(payload: bytes, view_name: str) -> list:
         root = ET.fromstring(payload)
     except ET.ParseError as exc:
         raise TallyError("Endpoint ne valid Tally XML nahi bheja.") from exc
-    if _name(root) != "ENVELOPE":
+    if _name(root) not in ("ENVELOPE", "RESPONSE"):
         raise TallyError("Endpoint Tally XML server jaisa response nahi de raha.")
+    return root
+
+
+def parse_collection_response(payload: bytes, view_name: str) -> list:
+    root = parse_xml_root(payload)
     status = next((n.text for n in root.iter() if _name(n) == "STATUS"), None)
     if status and status.strip() == "0":
         detail = next((n.text for n in root.iter() if _name(n) == "LINEERROR"), None)

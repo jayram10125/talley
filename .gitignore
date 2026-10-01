@@ -3,3 +3,8 @@ myenv/
 __pycache__/
 *.pyc
 .pytest_cache/
+uvicorn.*.log
+data/
+*.sqlite3
+.tally-connect/
+connector.json

@@ -62,6 +62,8 @@ Attach a persistent disk mounted at `/var/data` before using that database path.
 
 After deployment, `/api/config` should require the browser's administrator login and return `{"mode":"cloud"}`. The page should show **CLOUD CONNECTOR** and **Pair new PC**. Pair the Tally PC, run the connector there, then refresh the PC list and connect. The cloud web service alone cannot connect to `localhost:9001` on the Tally PC.
 
+If **Refresh PCs** shows no connector and `/api/bridge/connectors` returns `[]`, the current server has no pairing record. Stop the PC connector, create a fresh code with **Pair new PC**, and rerun its pairing command. If this repeats after a Render restart or deploy, move `BRIDGE_DB_PATH` to a persistent disk and run only one service instance. The connector terminal should report **Cloud pairing verified** with current code; a saved token from a lost SQLite database cannot be reused.
+
 The current cloud mode is a **single-owner live deployment** protected by one administrator login. It supports pairing several Tally PCs to that owner. It is not a multi-customer SaaS account system: customer accounts, tenant isolation, billing, and audit logs need separate development before selling shared access to unrelated customers.
 
 1. Deploy this project on a server with a public HTTPS URL and a **persistent disk**. Configure environment variables:

@@ -51,6 +51,10 @@ class BridgeTests(unittest.TestCase):
                     pair = client.post("/api/bridge/pair-codes", auth=auth).json()
                     registered = client.post("/api/bridge/register", json={"code": pair["code"]}).json()
                     agent_headers = {"Authorization": "Bearer " + registered["token"]}
+                    listed = client.get("/api/bridge/connectors", auth=auth)
+                    self.assertEqual(listed.status_code, 200)
+                    self.assertEqual(listed.headers["cache-control"], "no-store")
+                    self.assertEqual(listed.json()[0]["id"], registered["connector_id"])
                     stop = threading.Event()
 
                     def agent():

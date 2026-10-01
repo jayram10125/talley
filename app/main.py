@@ -9,7 +9,7 @@ from io import StringIO
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Query, Request
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse, JSONResponse, Response
 from pydantic import BaseModel, Field
 
 from app.catalog import VIEWS, select_rows
@@ -82,7 +82,7 @@ def pair_code():
 def connectors():
     if not CLOUD_MODE:
         raise HTTPException(404)
-    return BRIDGE.connectors()
+    return JSONResponse(BRIDGE.connectors(), headers={"Cache-Control": "no-store"})
 
 
 @app.delete("/api/bridge/connectors/{connector_id}")

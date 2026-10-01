@@ -61,11 +61,14 @@ async def run(server, pair_code, tally_host, tally_port, config_path):
         if not saved.get("token"):
             raise ValueError("Pehli baar --pair-code zaroori hai.")
         headers = {"Authorization": "Bearer " + saved["token"]}
-        print(f"Connector running. Tally endpoint: {tally_host}:{tally_port}")
+        started = False
         while True:
             try:
                 response = await client.get(server + "/api/bridge/agent/jobs", headers=headers)
                 response.raise_for_status()
+                if not started:
+                    print(f"Connector running. Cloud pairing verified. Tally endpoint: {tally_host}:{tally_port}")
+                    started = True
                 job = response.json()
                 if not job:
                     await asyncio.sleep(1)
@@ -88,6 +91,11 @@ async def run(server, pair_code, tally_host, tally_port, config_path):
                         print("Result delivery failed for job", job["id"], str(exc))
                         await asyncio.sleep(5)
                 print("Job", job["id"], "complete" if "xml_base64" in data else data["error"])
+            except httpx.HTTPStatusError as exc:
+                if exc.response.status_code in (401, 403):
+                    raise RuntimeError("Cloud pairing invalid hai. Website par Pair new PC se naya code lekar connector dobara chalayein.") from exc
+                print("Connector issue:", str(exc))
+                await asyncio.sleep(5)
             except (httpx.HTTPError, KeyError, json.JSONDecodeError) as exc:
                 print("Connector issue:", str(exc))
                 await asyncio.sleep(5)
